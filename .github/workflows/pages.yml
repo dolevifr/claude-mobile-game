@@ -1,4 +1,4 @@
-name: Deploy to GitHub Pages
+name: Deploy
 
 on:
   push:
@@ -24,8 +24,42 @@ jobs:
           node-version: 22
       - run: npm test
 
-  deploy:
+  # Deploys the reminder push server to Cloudflare when the CLOUDFLARE_API_TOKEN and
+  # CLOUDFLARE_ACCOUNT_ID secrets are set. Without them the app works with in-app reminders only.
+  push-server:
     needs: test
+    runs-on: ubuntu-latest
+    outputs:
+      url: ${{ steps.address.outputs.url }}
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        if: env.CLOUDFLARE_API_TOKEN != ''
+      - uses: actions/setup-node@v4
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        with:
+          node-version: 22
+      - name: Deploy push server
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        working-directory: server
+        run: |
+          npm ci
+          npx wrangler deploy
+      - name: Find the server address
+        id: address
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        run: |
+          subdomain=$(curl -fsS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain" | jq -r '.result.subdomain')
+          url="https://ozer-push.$subdomain.workers.dev"
+          curl -fsS "$url/" > /dev/null
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Push server: $url" >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    needs: push-server
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -34,9 +68,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
       - name: Collect site files
+        env:
+          PUSH_SERVER_URL: ${{ vars.PUSH_SERVER_URL || needs.push-server.outputs.url }}
         run: |
           mkdir _site
           cp -r index.html manifest.webmanifest sw.js css js icons _site/
+          printf "export const PUSH_SERVER = '%s';\n" "$PUSH_SERVER_URL" > _site/js/config.js
+          cat _site/js/config.js
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

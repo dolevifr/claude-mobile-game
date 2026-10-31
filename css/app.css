@@ -262,6 +262,26 @@ h1, h2, h3 { text-wrap: balance; }
 .banner p { flex: 1 1 180px; min-width: 0; }
 .banner .btn { background: var(--surface); color: var(--accent); box-shadow: var(--shadow); }
 .banner.is-warning { background: var(--surface-2); }
+.banner.is-reminder {
+  position: relative;
+  align-items: flex-start;
+  padding-inline-end: 44px;
+  background: var(--surface);
+  box-shadow: var(--shadow), inset 0 0 0 1.5px var(--accent);
+}
+.banner.is-reminder .btn { background: var(--accent); color: var(--accent-ink); }
+.banner-ico {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.banner-x { position: absolute; top: 4px; left: 4px; width: 38px; height: 38px; color: var(--muted); }
+.banner-x .ico { width: 18px; height: 18px; }
 
 /* ---------- Task groups ---------- */
 

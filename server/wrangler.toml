@@ -1,0 +1,22 @@
+name = "ozer-push"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+workers_dev = true
+
+[vars]
+# Where the app is served from. Add other origins (comma separated) if you host it elsewhere.
+ALLOWED_ORIGINS = "https://dolevifr.github.io,http://localhost:8080,http://127.0.0.1:8080"
+# Contact URL sent to Apple/Google with each push, as the Web Push standard asks.
+VAPID_SUBJECT = "https://dolevifr.github.io/claude-mobile-game/"
+
+[[durable_objects.bindings]]
+name = "DEVICES"
+class_name = "Device"
+
+[[durable_objects.bindings]]
+name = "KEYS"
+class_name = "VapidKeys"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Device", "VapidKeys"]

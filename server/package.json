@@ -1,0 +1,13 @@
+{
+  "name": "ozer-push",
+  "private": true,
+  "type": "module",
+  "description": "שרת שליחת התזכורות של העוזר (Cloudflare Worker)",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "4.156.0"
+  }
+}

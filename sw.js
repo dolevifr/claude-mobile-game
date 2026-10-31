@@ -1,7 +1,7 @@
 // Offline support and notification actions.
 // Bump VERSION whenever app files change so phones pick up the new version.
 
-const VERSION = 'ozer-v1';
+const VERSION = 'ozer-v2';
 const FONT_CACHE = 'ozer-fonts';
 const SHELL = [
   './',
@@ -9,9 +9,11 @@ const SHELL = [
   './manifest.webmanifest',
   './css/app.css',
   './js/app.js',
+  './js/config.js',
   './js/dates.js',
   './js/icons.js',
   './js/parse.js',
+  './js/push.js',
   './js/reminders.js',
   './js/store.js',
   './icons/icon.svg',
@@ -69,15 +71,43 @@ self.addEventListener('fetch', (event) => {
   })());
 });
 
+// Reminders sent by the push server (server/ folder) while the app is closed.
+self.addEventListener('push', (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { title: event.data?.text() };
+  }
+  event.waitUntil(self.registration.showNotification(data.title || 'תזכורת', {
+    body: data.body || '',
+    tag: data.taskId ? `task-${data.taskId}` : `ozer-${data.type || 'push'}`,
+    renotify: true,
+    requireInteraction: true,
+    icon: 'icons/icon-192.png',
+    badge: 'icons/badge-96.png',
+    lang: 'he',
+    dir: 'rtl',
+    vibrate: [200, 100, 200],
+    data: { id: data.taskId || null },
+    actions: data.taskId ? [{ action: 'done', title: 'בוצע' }, { action: 'snooze', title: 'עוד 10 דקות' }] : [],
+  }));
+});
+
 // "Done" and "snooze" are handled by an open window when there is one, without bringing it forward.
+// A plain tap opens the app on the reminder card (iPhone notifications have no buttons).
 self.addEventListener('notificationclick', (event) => {
   const id = event.notification.data?.id;
   const action = event.action || 'open';
   event.notification.close();
-  if (!id) return;
   event.waitUntil((async () => {
     const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     const client = windows[0];
+    if (!id) {
+      if (client) await client.focus().catch(() => {});
+      else await self.clients.openWindow('./');
+      return;
+    }
     if (client) {
       client.postMessage({ type: 'reminder-action', action, id });
       if (action === 'open') await client.focus().catch(() => {});

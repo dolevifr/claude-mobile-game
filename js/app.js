@@ -1,7 +1,7 @@
 import { icon } from './icons.js';
 import {
   REPEATS, REMIND_OPTIONS, todayISO, addDays, relativeDay, shortDate, longDate, hebrewDate, greetingFor,
-  toTimestamp, fromISODate, WEEKDAYS,
+  toTimestamp, fromISODate, WEEKDAYS, toISODate, timeFromDate,
 } from './dates.js';
 import { parseQuickAdd } from './parse.js';
 import {
@@ -15,6 +15,10 @@ import {
   setServiceWorker, notificationState, requestNotifications, showSystemNotification, startReminderLoop,
   setBadge, unlockAudio, chime, vibrate, buildICS, googleCalendarUrl,
 } from './reminders.js';
+import {
+  pushSupport, pushActive, getPushState, preparePush, enablePush, disablePush, sendTestPush, scheduleSync, syncNow,
+  refreshPush,
+} from './push.js';
 
 const VIEWS = { today: 'היום', upcoming: 'בקרוב', important: 'חשוב', lists: 'רשימות' };
 const COLOR_NAMES = { blue: 'כחול', violet: 'סגול', green: 'ירוק', orange: 'כתום', pink: 'ורוד', teal: 'טורקיז' };
@@ -27,6 +31,7 @@ const ui = {
   showDone: false,
   expanded: new Set(),
   alerts: [],
+  reminderBannerHidden: false,
 };
 
 let installPrompt = null;
@@ -240,6 +245,7 @@ function render() {
     html += `<div class="banner"><p>אלה משימות לדוגמה שמראות מה אפשר לעשות. כשתסיימו להתנסות אפשר למחוק את כולן.</p>
       <button type="button" class="btn btn-soft btn-sm" data-act="delete-samples">מחיקת הדוגמאות</button></div>`;
   }
+  if (!ui.query && ui.view === 'today') html += reminderBanner(s);
   const views = { today: renderToday, upcoming: renderUpcoming, important: renderImportant, lists: renderLists };
   html += ui.query ? renderSearch(s, now) : views[ui.view](s, now);
   $('#main').innerHTML = html;
@@ -252,6 +258,68 @@ function render() {
   todayBadge.setAttribute('aria-label', `${overdue} באיחור`);
   setBadge(badge);
   renderAlerts();
+}
+
+// ---------- Reminders reaching the phone ----------
+
+// What still stands between the person and reminders that reach the phone, or null when nothing does.
+function reminderGap() {
+  if (isEmbedded) return null;
+  const support = pushSupport();
+  if (support === 'ok') {
+    if (pushActive()) return null;
+    if (Notification.permission === 'denied') return 'denied';
+    return getPushState().enabled ? 'expired' : 'off';
+  }
+  if (isIOS && !isStandalone()) return 'install';
+  if (support === 'no-server' && notificationState() === 'default') return 'off';
+  return null;
+}
+
+const GAP_TEXT = {
+  install: 'ב-iPhone תזכורות מגיעות לטלפון רק אחרי שמוסיפים את העוזר למסך הבית: כפתור השיתוף ב-Safari ואז "הוספה למסך הבית". אחר כך פותחים אותו מהאייקון.',
+  off: 'התזכורות עדיין לא יגיעו לטלפון כשהעוזר סגור. צריך לאשר התראות פעם אחת.',
+  expired: 'התזכורות לטלפון הפסיקו לעבוד, כנראה כי ההרשאה בוטלה. צריך להפעיל אותן מחדש.',
+  denied: 'ההתראות חסומות, אז תזכורות לא יגיעו לטלפון. ב-iPhone: הגדרות ← התראות ← עוזר ← לאפשר התראות.',
+};
+
+function reminderBanner(s) {
+  const gap = reminderGap();
+  if (!gap || ui.reminderBannerHidden) return '';
+  if (!s.tasks.some((t) => !t.done && t.remind != null)) return '';
+  const action = gap === 'off' || gap === 'expired'
+    ? `<button type="button" class="btn btn-primary btn-sm" data-act="enable-reminders">${icon('bell')}${gap === 'expired' ? 'הפעלה מחדש' : 'הפעלת התראות'}</button>`
+    : '';
+  return `<div class="banner is-reminder"><span class="banner-ico">${icon('bell')}</span><p>${GAP_TEXT[gap]}</p>${action}
+    <button type="button" class="icon-btn banner-x" data-act="hide-reminder-banner" aria-label="הסתרה">${icon('x')}</button></div>`;
+}
+
+// Turns on reminders that reach the phone. With the push server they arrive even when the app is
+// closed; without it, plain notifications that need the app open or in the background.
+async function enableReminders() {
+  if (pushSupport() === 'ok') {
+    try {
+      const result = await enablePush(getState().tasks);
+      if (result.ok) toast('מעולה! תזכורות יגיעו לטלפון גם כשהעוזר סגור');
+      else {
+        toast(result.reason === 'denied' ? GAP_TEXT.denied : 'לא הצלחתי להפעיל התראות. נסו שוב.');
+        preparePush().catch(() => {});
+      }
+      render();
+      return result.ok;
+    } catch {
+      toast('אין חיבור לשרת התזכורות. נסו שוב כשיש אינטרנט.');
+      return false;
+    }
+  }
+  const result = await requestNotifications();
+  toast(result === 'granted' ? 'ההתראות הופעלו' : 'ההתראות לא אושרו');
+  render();
+  return result === 'granted';
+}
+
+function afterPushSync(state) {
+  if (state.gone) render();
 }
 
 // ---------- Toast ----------
@@ -306,7 +374,7 @@ function handleReminderAction(action, id) {
     snoozeTask(id, 10);
     toast('אזכיר שוב בעוד 10 דקות');
   } else if (action === 'open') {
-    openTaskSheet(id);
+    ui.alerts.unshift(id);
   }
   renderAlerts();
   reminderLoop?.schedule();
@@ -528,14 +596,15 @@ function openTaskSheet(id, preset = {}) {
     } else if (remind !== '' && !f.time.value) {
       html = 'בלי שעה, התזכורת תגיע ב-09:00.';
     }
-    if (remind !== '' && f.due.value && notificationState() === 'default' && !isEmbedded) {
-      html += `${html ? ' ' : ''}כדי לקבל התראה גם כשהאפליקציה ברקע, צריך לאשר התראות. <button type="button" class="btn btn-soft btn-sm" id="noteEnable">${icon('bell')}הפעלת התראות</button>`;
+    const gap = reminderGap();
+    if (remind !== '' && f.due.value && gap) {
+      const canEnable = gap === 'off' || gap === 'expired';
+      html += `${html ? ' ' : ''}${GAP_TEXT[gap]}${canEnable ? ` <button type="button" class="btn btn-soft btn-sm" id="noteEnable">${icon('bell')}הפעלת התראות</button>` : ''}`;
     }
     note.innerHTML = html;
     note.hidden = !html;
     $('#noteEnable', sheet)?.addEventListener('click', async () => {
-      const result = await requestNotifications();
-      toast(result === 'granted' ? 'ההתראות הופעלו' : 'ההתראות לא אושרו');
+      await enableReminders();
       syncNote();
     });
   };
@@ -827,11 +896,35 @@ function openListSheet(id) {
 
 // ---------- Settings ----------
 
+function pushSection() {
+  const gap = reminderGap();
+  const p = getPushState();
+  if (!gap) {
+    let detail;
+    if (p.error) detail = 'אין כרגע חיבור לשרת התזכורות. שינויים יישלחו כשיחזור האינטרנט.';
+    else if (p.next) {
+      const at = new Date(p.next);
+      detail = `${p.scheduled} תזכורות מתוזמנות. הבאה: ${relativeDay(toISODate(at))} ב-${timeFromDate(at)}.`;
+    } else detail = 'אין כרגע תזכורות מתוזמנות.';
+    return `<div class="set-row"><span class="status is-on">תזכורות מגיעות לטלפון גם כשהעוזר סגור</span></div>
+      <p class="set-note">${detail}</p>
+      <div class="set-row" style="justify-content:flex-start">
+        <button type="button" class="btn btn-ghost btn-sm" id="testPush">${icon('bell')}התראת ניסיון</button>
+        <button type="button" class="btn btn-ghost btn-sm is-danger-text" id="disablePush">כיבוי</button>
+      </div>`;
+  }
+  if (gap === 'denied') return `<div class="set-row"><span class="status is-off">ההתראות חסומות</span></div><p class="set-note">${GAP_TEXT.denied}</p>`;
+  return `<div class="set-row"><p>${gap === 'expired' ? GAP_TEXT.expired : 'הפעילו התראות כדי שתזכורות יגיעו לטלפון בזמן, גם כשהעוזר סגור.'}</p>
+    <button type="button" class="btn btn-primary btn-sm" id="enableNotif">${icon('bell')}${gap === 'expired' ? 'הפעלה מחדש' : 'הפעלת התראות'}</button></div>`;
+}
+
 function notificationSection() {
   const state = notificationState();
   if (isEmbedded) {
     return `<p class="set-note">כאן זו תצוגה מקדימה. התראות עובדות כשפותחים את העוזר ישירות בדפדפן או מהמסך הבית. בינתיים תזכורות יופיעו בתוך הדף עם צליל.</p>`;
   }
+  if (pushSupport() === 'ok') return pushSection();
+  if (isIOS && !isStandalone()) return `<p class="set-note">${GAP_TEXT.install}</p>`;
   if (state === 'unsupported') {
     return isIOS && !isStandalone()
       ? '<p class="set-note">ב-iPhone ההתראות עובדות אחרי שמוסיפים את העוזר למסך הבית (ראו "התקנה" למטה).</p>'
@@ -877,7 +970,9 @@ function openSettings() {
           <select id="sDefaultRemind" class="text-input">${remindOptions(s.settings.defaultRemind)}</select>
         </div>
         <label class="switch" for="sSound"><input type="checkbox" id="sSound" role="switch" ${s.settings.sound ? 'checked' : ''}>צליל כשתזכורת מופיעה</label>
-        <p class="set-note">תזכורות מגיעות כשהעוזר פתוח או ברקע. כדי שתזכורת תגיע גם כשהוא סגור לגמרי, אפשר להוסיף את המשימה ליומן של הטלפון מתוך מסך העריכה שלה.</p>
+        ${pushActive() ? '' : `<p class="set-note">${pushSupport() === 'no-server'
+          ? 'שרת התזכורות עוד לא הוגדר, לכן תזכורות מגיעות רק כשהעוזר פתוח או ברקע. עד שיוגדר, אפשר להוסיף משימה חשובה ליומן של הטלפון מתוך מסך העריכה שלה.'
+          : 'תזכורת שחייבת להגיע אפשר גם להוסיף ליומן של הטלפון מתוך מסך העריכה של המשימה.'}</p>`}
       </section>
       <section class="set-section">
         <h3>מראה</h3>
@@ -911,8 +1006,24 @@ function openSettings() {
 
   const wire = () => {
     $('#enableNotif', sheet)?.addEventListener('click', async () => {
-      const result = await requestNotifications();
-      toast(result === 'granted' ? 'ההתראות הופעלו' : 'ההתראות לא אושרו');
+      await enableReminders();
+      draw();
+    });
+    $('#testPush', sheet)?.addEventListener('click', async (e) => {
+      e.currentTarget.disabled = true;
+      try {
+        const result = await sendTestPush();
+        if (result.ok) toast('נשלחה התראת ניסיון. היא תופיע בעוד כמה שניות.');
+        else if (result.gone) toast(GAP_TEXT.expired);
+        else toast('השרת לא הצליח לשלוח את ההתראה. נסו שוב בעוד דקה.');
+      } catch {
+        toast('אין חיבור לשרת התזכורות.');
+      }
+      draw();
+    });
+    $('#disablePush', sheet)?.addEventListener('click', async () => {
+      await disablePush();
+      toast('התזכורות לטלפון כובו');
       draw();
     });
     $('#testNotif', sheet)?.addEventListener('click', async () => {
@@ -1024,6 +1135,11 @@ function wireEvents() {
         openTaskSheet(null, preset);
         break;
       }
+      case 'enable-reminders': enableReminders(); break;
+      case 'hide-reminder-banner':
+        ui.reminderBannerHidden = true;
+        render();
+        break;
       case 'delete-samples': {
         const removed = deleteSamples();
         toast('הדוגמאות נמחקו', () => restoreTasks(removed));
@@ -1109,6 +1225,11 @@ function wireEvents() {
     installPrompt = e;
   });
 
+  window.addEventListener('online', () => syncNow(getState().tasks).then(afterPushSync));
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) scheduleSync(() => getState().tasks, afterPushSync);
+  });
+
   document.addEventListener('pointerdown', unlockAudio, { once: true });
   document.addEventListener('keydown', unlockAudio, { once: true });
 
@@ -1153,12 +1274,17 @@ function boot() {
   subscribe(() => {
     render();
     reminderLoop?.schedule();
+    scheduleSync(() => getState().tasks, afterPushSync);
   });
   wireEvents();
   render();
   registerServiceWorker();
   reminderLoop = startReminderLoop({ getTasks: () => getState().tasks, onDue: onRemindersDue });
   handleLaunchParams();
+  if (pushSupport() === 'ok') {
+    if (getPushState().enabled) refreshPush(getState().tasks).then(render);
+    else preparePush().catch(() => {});
+  }
 }
 
 boot();
