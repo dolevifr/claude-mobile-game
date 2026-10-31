@@ -1,0 +1,11 @@
+{
+  "name": "ozer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "העוזר שלי: משימות, תזכורות והתראות. אפליקציית ווב שמותקנת על הטלפון.",
+  "type": "module",
+  "scripts": {
+    "start": "python3 -m http.server 8080",
+    "test": "node --test tests/*.test.js"
+  }
+}
