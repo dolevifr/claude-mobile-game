@@ -1,0 +1,710 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+</head>
+<body>
+<title>גחלת</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700;900&family=Assistant:wght@400;600;700&display=swap">
+<style>
+/* Layout: one sticky stage over a tall scroll track. Scrolling drops each burger layer into place
+   while the background moves through the color of that ingredient; menu and branches follow. */
+:root {
+  --ink: #24150C;
+  --ink-soft: rgb(36 21 12 / .68);
+  --line: rgb(36 21 12 / .22);
+  --paper: #F4F0E9;
+  --coal: #1D120B;
+  --ember: #D9572B;
+  --stage-bg: #EDB79B;
+  --font-display: "Frank Ruhl Libre", "David Libre", Georgia, serif;
+  --font-body: "Assistant", "Heebo", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  --gutter-l: max(16px, env(safe-area-inset-left, 0px));
+  --gutter-r: max(16px, env(safe-area-inset-right, 0px));
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html { direction: rtl; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 17px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, p { margin: 0; }
+h1, h2, h3 { text-wrap: balance; }
+a { color: inherit; }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; border-radius: 6px; }
+
+/* ---------- Nav ---------- */
+.nav {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 20;
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.nav-inner {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 18px var(--gutter-r) 18px var(--gutter-l);
+}
+.logo {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 1.9rem;
+  line-height: 1;
+  text-decoration: none;
+  letter-spacing: -.01em;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.logo i { width: 9px; height: 9px; border-radius: 50%; background: var(--ember); display: inline-block; transform: translateY(-2px); }
+.nav-links { display: flex; gap: 22px; font-size: .92rem; font-weight: 600; }
+.nav-links a { text-decoration: none; opacity: .78; }
+.nav-links a:hover { opacity: 1; }
+.nav-cta { margin-inline-start: auto; display: flex; gap: 10px; align-items: center; }
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 20px;
+  border-radius: 99px;
+  border: 0;
+  background: var(--ink);
+  color: #FBF6EE;
+  font-weight: 700;
+  font-size: .92rem;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: transform .2s;
+}
+.pill:hover { transform: translateY(-1px); }
+.pill.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--ink); }
+.pill svg { width: 16px; height: 16px; }
+
+/* ---------- Build track ---------- */
+.track { position: relative; height: 600vh; height: 600svh; }
+.stage {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  height: 100svh;
+  overflow: hidden;
+  background: var(--stage-bg);
+}
+.stage-inner {
+  position: relative;
+  height: 100%;
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: calc(84px + env(safe-area-inset-top, 0px)) var(--gutter-r) calc(28px + env(safe-area-inset-bottom, 0px)) var(--gutter-l);
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  align-items: center;
+  gap: 24px;
+}
+.frame {
+  position: absolute;
+  inset: calc(84px + env(safe-area-inset-top, 0px)) var(--gutter-r) calc(28px + env(safe-area-inset-bottom, 0px)) var(--gutter-l);
+  border: 1px solid var(--line);
+  pointer-events: none;
+}
+.frame::before, .frame::after {
+  content: "";
+  position: absolute;
+  background: var(--line);
+}
+.frame::before { top: 0; bottom: 0; right: 41.6%; width: 1px; }
+.frame::after { left: 0; right: 41.6%; top: 64%; height: 1px; }
+
+.copy { position: relative; height: 100%; min-width: 0; z-index: 2; }
+.panel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 18px;
+  padding-inline: clamp(8px, 3vw, 40px);
+  will-change: transform, opacity;
+}
+.kicker {
+  font-size: .78rem;
+  font-weight: 700;
+  letter-spacing: .14em;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.kicker::before { content: ""; width: 28px; height: 1.5px; background: currentColor; }
+.panel h2 {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: clamp(2.7rem, 6.4vw, 6.4rem);
+  line-height: .92;
+  letter-spacing: -.02em;
+}
+.panel p { max-width: 34ch; color: var(--ink-soft); font-size: 1.05rem; }
+.panel .pill { align-self: flex-start; margin-top: 6px; }
+
+.plate-zone { position: relative; height: 100%; min-width: 0; display: grid; place-items: center; }
+.burger {
+  width: min(100%, 680px);
+  height: auto;
+  max-height: 88%;
+  overflow: visible;
+  filter: drop-shadow(0 30px 40px rgb(60 25 5 / .18));
+}
+.burger .float { animation: bob 5s ease-in-out infinite; transform-origin: center; }
+.steam path { fill: none; stroke: #fff; stroke-width: 6; stroke-linecap: round; opacity: .55; animation: steam 2.8s ease-in-out infinite; }
+.steam path:nth-child(2) { animation-delay: .9s; }
+.steam path:nth-child(3) { animation-delay: 1.8s; }
+
+.tag {
+  position: absolute;
+  font-size: .8rem;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 99px;
+  background: rgb(255 255 255 / .55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  white-space: nowrap;
+  transition: opacity .4s, transform .4s;
+}
+.tag b { font-family: var(--font-display); font-weight: 900; margin-inline-end: 4px; }
+
+.dots {
+  position: absolute;
+  left: calc(var(--gutter-l) + 18px);
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  gap: 10px;
+  z-index: 3;
+}
+.dots button {
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  border-radius: 99px;
+  border: 1.5px solid var(--ink);
+  background: transparent;
+  transition: height .3s, background-color .3s;
+}
+.dots button[aria-current="true"] { height: 28px; background: var(--ink); }
+.counter {
+  position: absolute;
+  left: calc(var(--gutter-l) + 14px);
+  bottom: calc(44px + env(safe-area-inset-bottom, 0px));
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  direction: ltr;
+  z-index: 3;
+}
+.counter span { opacity: .45; }
+.scroll-cue {
+  position: absolute;
+  right: 50%;
+  transform: translateX(50%);
+  bottom: calc(40px + env(safe-area-inset-bottom, 0px));
+  font-size: .78rem;
+  font-weight: 700;
+  letter-spacing: .12em;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  z-index: 3;
+  transition: opacity .3s;
+}
+.scroll-cue::after { content: ""; width: 1.5px; height: 34px; background: linear-gradient(var(--ink), transparent); animation: cue 1.6s ease-in-out infinite; }
+
+/* ---------- Menu ---------- */
+.section {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: clamp(64px, 10vw, 120px) var(--gutter-r) clamp(64px, 10vw, 120px) var(--gutter-l);
+}
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin-bottom: 40px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--line);
+}
+.section-head h2 {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: clamp(2.4rem, 5.5vw, 4.8rem);
+  line-height: .95;
+  letter-spacing: -.02em;
+}
+.section-head p { max-width: 38ch; color: var(--ink-soft); }
+.menu {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+}
+.item { display: flex; flex-direction: column; gap: 10px; }
+.item-art {
+  aspect-ratio: 4 / 4.4;
+  max-width: 100%;
+  border-radius: 4px;
+  display: grid;
+  place-items: center;
+  background: var(--tile);
+  overflow: hidden;
+  transition: transform .5s cubic-bezier(.2, .8, .2, 1);
+}
+.item:hover .item-art { transform: translateY(-4px); }
+.item-art svg { width: 82%; height: auto; overflow: visible; transition: transform .6s cubic-bezier(.3, 1.4, .5, 1); }
+.item:hover .item-art svg { transform: scale(1.06) rotate(-2deg); }
+.item-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-top: 6px; }
+.item h3 { font-family: var(--font-display); font-weight: 900; font-size: 1.55rem; line-height: 1.1; }
+.price { font-family: var(--font-display); font-weight: 700; font-size: 1.3rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.item p { color: var(--ink-soft); font-size: .95rem; }
+.layers-count { font-size: .76rem; font-weight: 700; letter-spacing: .1em; color: var(--ember); }
+
+.strip {
+  background: var(--coal);
+  color: #F6EEE2;
+}
+.strip .section-head { border-color: rgb(246 238 226 / .2); }
+.strip .section-head p, .strip .branch p { color: rgb(246 238 226 / .7); }
+.branches { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; }
+.branch {
+  padding: 26px 0 26px 28px;
+  border-inline-start: 1px solid rgb(246 238 226 / .2);
+  padding-inline-start: 28px;
+  display: grid;
+  gap: 8px;
+}
+.branch:first-child { border-inline-start: 0; padding-inline-start: 0; }
+.branch h3 { font-family: var(--font-display); font-weight: 900; font-size: 1.9rem; }
+.hours { font-variant-numeric: tabular-nums; }
+.strip .pill { background: #F6EEE2; color: var(--coal); }
+.footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding-top: 28px;
+  margin-top: 56px;
+  border-top: 1px solid rgb(246 238 226 / .2);
+  font-size: .88rem;
+  color: rgb(246 238 226 / .6);
+}
+.footer .logo { color: #F6EEE2; font-size: 1.5rem; }
+
+@keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
+@keyframes steam { 0% { transform: translateY(14px); opacity: 0; } 35% { opacity: .55; } 100% { transform: translateY(-34px); opacity: 0; } }
+@keyframes cue { 0%, 100% { transform: scaleY(.4); transform-origin: top; } 50% { transform: scaleY(1); transform-origin: top; } }
+
+@media (max-width: 860px) {
+  .nav-links { display: none; }
+  .stage-inner {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 46fr) minmax(0, 54fr);
+    gap: 0;
+    padding-top: calc(74px + env(safe-area-inset-top, 0px));
+  }
+  .frame { display: none; }
+  .panel { justify-content: flex-end; gap: 12px; padding-inline: 4px; padding-bottom: 6px; }
+  .panel h2 { font-size: clamp(2.5rem, 12vw, 4rem); }
+  .panel p { font-size: .98rem; }
+  .burger { max-height: 100%; width: min(100%, 440px); }
+  .dots { top: auto; bottom: calc(110px + env(safe-area-inset-bottom, 0px)); left: calc(var(--gutter-l) + 4px); transform: none; }
+  .counter { left: var(--gutter-l); bottom: calc(66px + env(safe-area-inset-bottom, 0px)); }
+  .scroll-cue { display: none; }
+  .tag { font-size: .72rem; }
+  .menu { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .branches { grid-template-columns: minmax(0, 1fr); }
+  .branch, .branch:first-child { border-inline-start: 0; padding-inline-start: 0; border-top: 1px solid rgb(246 238 226 / .2); }
+  .branch:first-child { border-top: 0; }
+}
+@media (max-width: 420px) {
+  .menu { grid-template-columns: minmax(0, 1fr); }
+  .nav-cta .ghost { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+
+<header class="nav">
+  <div class="nav-inner">
+    <a class="logo" href="#top">גחלת<i></i></a>
+    <nav class="nav-links" aria-label="ניווט">
+      <a href="#top">ההמבורגר</a>
+      <a href="#menu">תפריט</a>
+      <a href="#branches">סניפים</a>
+    </nav>
+    <div class="nav-cta">
+      <a class="pill ghost" href="#branches">סניפים</a>
+      <a class="pill" href="#menu">להזמנה</a>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+  <section class="track" aria-label="ההמבורגר נבנה שכבה אחרי שכבה">
+    <div class="stage" id="stage">
+      <div class="frame" aria-hidden="true"></div>
+      <div class="stage-inner">
+        <div class="copy" id="copy">
+          <article class="panel">
+            <span class="kicker">שכבה 1 · על הגחלים</span>
+            <h2>נצרב על<br>אש פתוחה</h2>
+            <p>קציצה של 200 גרם מבקר טרי שנטחן כל בוקר, נצרבת על פחם אמיתי עד שנוצר קרום כהה ובפנים נשאר עסיסי.</p>
+            <a class="pill" href="#menu">לתפריט</a>
+          </article>
+          <article class="panel">
+            <span class="kicker">שכבה 2 · צ'דר</span>
+            <h2>צ'דר שנמס<br>לאט</h2>
+            <p>צ'דר מיושן 12 חודשים, מונח על הקציצה בדקה האחרונה על האש, כדי שיימס ולא יתייבש.</p>
+          </article>
+          <article class="panel">
+            <span class="kicker">שכבה 3 · ירקות</span>
+            <h2>ירוק<br>מהשוק</h2>
+            <p>חסה ועגבנייה שמגיעות כל בוקר מהשוק ונפרסות רק כשההזמנה נכנסת.</p>
+          </article>
+          <article class="panel">
+            <span class="kicker">שכבה 4 · חמוצים</span>
+            <h2>חמוץ, חד,<br>מדויק</h2>
+            <p>בצל סגול שנכבש אצלנו ומלפפון חמוץ במלח. הביס החד שמאזן את כל השומן הטוב.</p>
+          </article>
+          <article class="panel">
+            <span class="kicker">שכבה 5 · סגירה</span>
+            <h2>סגור עד<br>הסוף</h2>
+            <p>רוטב הבית המעושן ולחמניית בריוש עם שומשום שנאפית אצלנו ונקלית בחמאה רגע לפני ההגשה.</p>
+          </article>
+          <article class="panel">
+            <span class="kicker">המבורגר גחלת · ₪58</span>
+            <h2>בנוי<br>לביס</h2>
+            <p>תשע שכבות, ביס אחד. כל המבורגר נבנה באותו סדר בדיוק, כי הסדר הוא חלק מהטעם.</p>
+            <a class="pill" href="#menu">להזמנה ←</a>
+          </article>
+        </div>
+        <div class="plate-zone" id="plateZone">
+          <svg class="burger" id="burger" viewBox="0 150 420 360" role="img" aria-label="המבורגר גחלת נבנה שכבה אחרי שכבה"></svg>
+        </div>
+      </div>
+      <div class="dots" id="dots" aria-label="שלבים"></div>
+      <div class="counter" id="counter" aria-hidden="true">01 <span>/ 06</span></div>
+      <div class="scroll-cue" id="cue" aria-hidden="true">גללו כדי לבנות</div>
+    </div>
+  </section>
+
+  <section class="section" id="menu">
+    <div class="section-head">
+      <h2>התפריט</h2>
+      <p>ארבעה המבורגרים, כולם על אש פתוחה ובלחמניית הבריוש שלנו. צ'יפס בגריסה עבה בצד, בלי תוספת תשלום.</p>
+    </div>
+    <div class="menu" id="menuGrid"></div>
+  </section>
+
+  <section class="strip" id="branches">
+    <div class="section">
+      <div class="section-head">
+        <h2>הגחלים דולקות</h2>
+        <p>אין הזמנת מקומות. באים, מחכים כמה דקות ליד הגריל, אוכלים חם.</p>
+      </div>
+      <div class="branches">
+        <div class="branch">
+          <h3>תל אביב</h3>
+          <p>נמל תל אביב, מול הים</p>
+          <p class="hours">א׳–ה׳ 12:00–00:00 · ו׳ 12:00–16:00</p>
+        </div>
+        <div class="branch">
+          <h3>ירושלים</h3>
+          <p>שוק מחנה יהודה</p>
+          <p class="hours">א׳–ה׳ 12:00–23:00 · מוצ״ש 19:00–01:00</p>
+        </div>
+        <div class="branch">
+          <h3>חיפה</h3>
+          <p>המושבה הגרמנית</p>
+          <p class="hours">א׳–ה׳ 12:00–23:30 · ו׳ 12:00–15:00</p>
+        </div>
+      </div>
+      <footer class="footer">
+        <a class="logo" href="#top">גחלת<i></i></a>
+        <span>המבורגר על אש פתוחה · נבנה שכבה אחרי שכבה</span>
+        <a class="pill" href="#menu">להזמנה</a>
+      </footer>
+    </div>
+  </section>
+</main>
+
+<script>
+// ---------- Layer drawings ----------
+// Each layer is drawn with its own top at y=0. `base` is where it rests on the layer below,
+// `seat` is where the next layer rests on it.
+function seeded(seed) {
+  let s = seed;
+  return () => ((s = (s * 16807) % 2147483647) / 2147483647);
+}
+
+function defs(p) {
+  return `<defs>
+    <linearGradient id="${p}-bun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E9A257"/><stop offset="1" stop-color="#A9591F"/></linearGradient>
+    <linearGradient id="${p}-top" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F2B768"/><stop offset=".55" stop-color="#D0803A"/><stop offset="1" stop-color="#A0521C"/></linearGradient>
+    <linearGradient id="${p}-patty" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7A4026"/><stop offset=".5" stop-color="#55291A"/><stop offset="1" stop-color="#341810"/></linearGradient>
+    <linearGradient id="${p}-veg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8E7A3A"/><stop offset="1" stop-color="#4E4220"/></linearGradient>
+    <linearGradient id="${p}-cheese" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFD66B"/><stop offset="1" stop-color="#EDA21F"/></linearGradient>
+    <linearGradient id="${p}-plate" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#E4DFD6"/></linearGradient>
+    <filter id="${p}-blur" x="-20%" y="-50%" width="140%" height="200%"><feGaussianBlur stdDeviation="8"/></filter>
+  </defs>`;
+}
+
+const LAYERS = {
+  bunBottom: { base: 76, seat: 14, draw: (p) => `
+    <path d="M62 14 Q58 76 210 76 Q362 76 358 14 Z" fill="url(#${p}-bun)"/>
+    <ellipse cx="210" cy="14" rx="148" ry="14" fill="#F3D39C"/>
+    <ellipse cx="210" cy="15" rx="124" ry="8" fill="#F8E1B6" opacity=".7"/>` },
+  patty: { base: 66, seat: 10, draw: (p) => patty(p, 'patty', 11) },
+  veg: { base: 66, seat: 10, draw: (p) => patty(p, 'veg', 29) },
+  cheese: { base: 14, seat: 6, draw: (p) => `
+    <path d="M56 9 Q210 -5 364 9 L368 15 Q210 25 52 15 Z" fill="url(#${p}-cheese)"/>
+    ${[78, 158, 248, 318].map((x, i) => `<path d="M${x} 13 L${x + 42} 14 Q${x + 26} ${22 + i % 2 * 6} ${x + 19} ${38 + (i % 2) * 10} Q${x + 12} 24 ${x} 13 Z" fill="#F2B232"/>`).join('')}
+    <path d="M70 10 Q210 0 350 10" stroke="#FFE8A3" stroke-width="2.5" fill="none" opacity=".8"/>` },
+  lettuce: { base: 20, seat: 8, draw: () => {
+    let d = 'M46 12';
+    for (let i = 0; i < 18; i++) { const x = 46 + i * 18.2; d += ` Q${x + 9} ${i % 2 ? 1 : -5} ${x + 18.2} 11`; }
+    d += ' L374 20';
+    for (let i = 0; i < 18; i++) { const x = 374 - i * 18.2; d += ` Q${x - 9} ${i % 2 ? 31 : 25} ${x - 18.2} 21`; }
+    return `<path d="${d} Z" fill="#6AA63A"/><path d="${d.split(' L')[0]}" fill="none" stroke="#A3D063" stroke-width="3" stroke-linejoin="round"/>`;
+  } },
+  tomato: { base: 18, seat: 6, draw: () => [128, 292].map((cx) => `
+    <ellipse cx="${cx}" cy="10" rx="84" ry="11" fill="#C9301F"/>
+    <ellipse cx="${cx}" cy="8" rx="76" ry="8" fill="#E8573B"/>
+    ${[-40, -14, 14, 40].map((dx) => `<ellipse cx="${cx + dx}" cy="8" rx="7" ry="2.6" fill="#F8B88A"/>`).join('')}`).join('') },
+  onion: { base: 10, seat: 4, draw: () => [118, 210, 302].map((cx) => `
+    <ellipse cx="${cx}" cy="5" rx="56" ry="6" fill="none" stroke="#9A5BB8" stroke-width="5"/>
+    <ellipse cx="${cx}" cy="5" rx="40" ry="4" fill="none" stroke="#C99BDD" stroke-width="3"/>`).join('') },
+  pickles: { base: 12, seat: 4, draw: () => [98, 176, 254, 326].map((cx) => `
+    <ellipse cx="${cx}" cy="6" rx="38" ry="7" fill="#5F822A"/>
+    <ellipse cx="${cx}" cy="5" rx="29" ry="4.5" fill="#A6C25B"/>
+    ${[-12, 0, 12].map((dx) => `<circle cx="${cx + dx}" cy="5" r="1.6" fill="#E9EDB2"/>`).join('')}`).join('') },
+  mushroom: { base: 14, seat: 5, draw: () => [104, 176, 248, 318].map((cx) => `
+    <path d="M${cx - 36} 9 Q${cx} -6 ${cx + 36} 9 Q${cx} 15 ${cx - 36} 9 Z" fill="#7B5635"/>
+    <path d="M${cx - 10} 9 L${cx - 7} 15 L${cx + 7} 15 L${cx + 10} 9 Z" fill="#D8BE98"/>`).join('') },
+  sauce: { base: 8, seat: 3, draw: () => `
+    <ellipse cx="210" cy="5" rx="150" ry="6" fill="#E0782F"/>
+    ${[96, 168, 262, 330].map((x, i) => `<path d="M${x - 6} 6 Q${x - 6} ${16 + i % 2 * 6} ${x} ${18 + i % 2 * 6} Q${x + 6} ${16 + i % 2 * 6} ${x + 6} 6 Z" fill="#E0782F"/>`).join('')}
+    <ellipse cx="190" cy="3" rx="70" ry="2" fill="#F5A564" opacity=".7"/>` },
+  bunTop: { base: 152, seat: 0, draw: (p) => {
+    const seeds = [[150, 40, -20], [196, 26, 8], [246, 36, 24], [118, 70, -32], [176, 62, 4], [224, 60, -10], [278, 68, 30], [140, 100, 12], [204, 96, -24], [262, 102, 6], [306, 98, -18], [96, 110, 26], [322, 124, 14]];
+    return `<path d="M56 152 Q48 4 210 0 Q372 4 364 152 Q210 166 56 152 Z" fill="url(#${p}-top)"/>
+      <path d="M56 152 Q210 166 364 152 L366 142 Q210 156 54 142 Z" fill="#8E4818" opacity=".55"/>
+      <ellipse cx="166" cy="46" rx="82" ry="28" fill="#fff" opacity=".16"/>
+      ${seeds.map(([x, y, r]) => `<ellipse cx="${x}" cy="${y}" rx="7.5" ry="3.4" transform="rotate(${r} ${x} ${y})" fill="#FBEBC6"/>`).join('')}`;
+  } },
+};
+
+function patty(p, tone, seed) {
+  const rnd = seeded(seed);
+  let char = '';
+  for (let i = 0; i < 46; i++) {
+    const x = 74 + rnd() * 272;
+    const y = 12 + rnd() * 48;
+    char += `<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="${(2 + rnd() * 6).toFixed(1)}" ry="${(1 + rnd() * 1.6).toFixed(1)}" fill="#1E0D06" opacity="${(.25 + rnd() * .35).toFixed(2)}"/>`;
+  }
+  return `<path d="M46 34 Q44 2 210 0 Q376 2 374 34 Q376 70 210 72 Q44 70 46 34 Z" fill="url(#${p}-${tone})"/>
+    <path d="M56 18 Q210 3 364 18" fill="none" stroke="${tone === 'veg' ? '#B5A25A' : '#9A5634'}" stroke-width="3" opacity=".7"/>${char}`;
+}
+
+function stackLayout(names, bottom = 470) {
+  const out = [];
+  names.forEach((name, i) => {
+    const L = LAYERS[name];
+    const y = i === 0 ? bottom - L.base : out[i - 1].y + LAYERS[out[i - 1].name].seat - L.base;
+    out.push({ name, y });
+  });
+  return out;
+}
+
+function burgerMarkup(names, p) {
+  const layout = stackLayout(names);
+  const top = layout[layout.length - 1].y;
+  const svg = `${defs(p)}
+    <ellipse cx="210" cy="474" rx="150" ry="12" fill="#3A1A08" opacity=".28" filter="url(#${p}-blur)"/>
+    ${layout.map((l) => `<g transform="translate(0 ${l.y})">${LAYERS[l.name].draw(p)}</g>`).join('')}`;
+  return { svg, viewBox: `0 ${Math.floor(top - 20)} 420 ${Math.ceil(500 - top)}` };
+}
+
+// ---------- The build ----------
+const ORDER = ['bunBottom', 'patty', 'cheese', 'lettuce', 'tomato', 'onion', 'pickles', 'sauce', 'bunTop'];
+// When each layer falls, in "section time" t (0 = first screen, 5 = last).
+const DROPS = { cheese: [0.3, 0.95], lettuce: [1.25, 1.75], tomato: [1.5, 1.98], onion: [2.25, 2.75], pickles: [2.5, 2.98], sauce: [3.25, 3.7], bunTop: [3.45, 3.98] };
+const SECTIONS = [
+  { bg: '#EDB79B' }, // ember peach
+  { bg: '#F0CC74' }, // cheddar
+  { bg: '#B9CDA2' }, // lettuce
+  { bg: '#D9C2DC' }, // red onion
+  { bg: '#E7D3B5' }, // brioche
+  { bg: '#F4F0E9' }, // plate
+];
+const TAGS = [
+  { at: 0, text: '<b>200</b>גרם בקר', x: 6, y: 66 },
+  { at: 1, text: '<b>12</b>חודשי יישון', x: 70, y: 52 },
+  { at: 2, text: 'נפרס <b>לפי</b>הזמנה', x: 4, y: 48 },
+  { at: 3, text: 'כבוש <b>בבית</b>', x: 72, y: 44 },
+  { at: 4, text: '<b>בריוש</b>בחמאה', x: 8, y: 22 },
+];
+
+const svg = document.getElementById('burger');
+const layout = stackLayout(ORDER);
+const stackTop = Math.floor(layout[layout.length - 1].y - 24);
+svg.setAttribute('viewBox', `0 ${stackTop} 420 ${520 - stackTop}`);
+const plateY = 470;
+svg.innerHTML = `${defs('m')}
+  <g id="plate" opacity="0">
+    <ellipse cx="210" cy="${plateY + 12}" rx="212" ry="40" fill="#3A1A08" opacity=".18" filter="url(#m-blur)"/>
+    <ellipse cx="210" cy="${plateY + 2}" rx="206" ry="36" fill="url(#m-plate)"/>
+    <ellipse cx="210" cy="${plateY - 2}" rx="160" ry="25" fill="#EDE8DF"/>
+  </g>
+  <ellipse id="shadow" cx="210" cy="474" rx="150" ry="12" fill="#3A1A08" opacity=".3" filter="url(#m-blur)"/>
+  <g class="float">
+    ${layout.map((l) => `<g class="layer" data-name="${l.name}" transform="translate(0 ${l.y})">${LAYERS[l.name].draw('m')}</g>`).join('')}
+    <g class="steam" id="steam" transform="translate(0 ${layout[1].y - 76})">
+      <path d="M170 70 q-12 -18 0 -34 q12 -16 0 -32"/>
+      <path d="M210 72 q-12 -18 0 -34 q12 -16 0 -32"/>
+      <path d="M250 70 q-12 -18 0 -34 q12 -16 0 -32"/>
+    </g>
+  </g>`;
+
+const zone = document.getElementById('plateZone');
+zone.insertAdjacentHTML('beforeend', TAGS.map((t, i) => `<span class="tag" data-tag="${i}" style="left:${t.x}%;top:${t.y}%">${t.text}</span>`).join(''));
+
+const layerEls = [...svg.querySelectorAll('.layer')];
+const panels = [...document.querySelectorAll('.panel')];
+const tags = [...document.querySelectorAll('.tag')];
+const stage = document.getElementById('stage');
+const track = document.querySelector('.track');
+const dotsEl = document.getElementById('dots');
+const counter = document.getElementById('counter');
+const cue = document.getElementById('cue');
+const plate = document.getElementById('plate');
+const steam = document.getElementById('steam');
+
+dotsEl.innerHTML = SECTIONS.map((_, i) => `<button type="button" aria-label="שלב ${i + 1}" data-i="${i}"></button>`).join('');
+const dots = [...dotsEl.children];
+
+const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+const easeOutBack = (x) => { const c1 = 1.25, c3 = c1 + 1; return 1 + c3 * (x - 1) ** 3 + c1 * (x - 1) ** 2; };
+const smooth = (x) => x * x * (3 - 2 * x);
+const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+const mix = (a, b, f) => { const A = hex(a), B = hex(b); return `rgb(${A.map((v, i) => Math.round(v + (B[i] - v) * f)).join(' ')})`; };
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function progress() {
+  const rect = track.getBoundingClientRect();
+  const span = track.offsetHeight - window.innerHeight;
+  return clamp(-rect.top / span) * (SECTIONS.length - 1);
+}
+
+let lastT = -1;
+function frame() {
+  const t = progress();
+  if (Math.abs(t - lastT) < 0.0005) return;
+  lastT = t;
+
+  // Background follows the ingredient of the current section.
+  const i = Math.min(Math.floor(t), SECTIONS.length - 2);
+  const f = smooth(clamp((t - i - 0.3) / 0.45));
+  stage.style.setProperty('--stage-bg', mix(SECTIONS[i].bg, SECTIONS[i + 1].bg, f));
+
+  layerEls.forEach((el, k) => {
+    const { name, y } = layout[k];
+    const win = DROPS[name];
+    let p = 1;
+    if (win) p = clamp((t - win[0]) / (win[1] - win[0]));
+    const e = reduced ? smooth(p) : easeOutBack(p);
+    const dy = -(1 - e) * 520;
+    const rot = (1 - p) * (k % 2 ? 9 : -9);
+    el.setAttribute('transform', `translate(0 ${(y + dy).toFixed(2)}) rotate(${rot.toFixed(2)} 210 ${LAYERS[name].base / 2})`);
+    el.style.opacity = win ? clamp(p * 5) : 1;
+  });
+
+  const plateP = smooth(clamp((t - 4.25) / 0.6));
+  plate.setAttribute('opacity', plateP.toFixed(3));
+  plate.setAttribute('transform', `translate(0 ${((1 - plateP) * 40).toFixed(1)})`);
+  steam.style.opacity = 1 - clamp((t - 0.15) / 0.3);
+
+  panels.forEach((el, k) => {
+    const d = t - k;
+    const vis = 1 - clamp(Math.abs(d) * 1.9);
+    el.style.opacity = vis.toFixed(3);
+    el.style.transform = `translateY(${(-d * 70).toFixed(1)}px)`;
+    el.style.visibility = vis > 0.01 ? 'visible' : 'hidden';
+    el.setAttribute('aria-hidden', vis < 0.5);
+  });
+
+  tags.forEach((el, k) => {
+    const d = t - TAGS[k].at;
+    const on = d > -0.25 && d < 0.45;
+    el.style.opacity = on ? 1 : 0;
+    el.style.transform = `translateY(${on ? 0 : 10}px)`;
+  });
+
+  const current = Math.round(t);
+  dots.forEach((b, k) => b.setAttribute('aria-current', String(k === current)));
+  counter.innerHTML = `0${current + 1} <span>/ 0${SECTIONS.length}</span>`;
+  cue.style.opacity = t < 0.15 ? 1 : 0;
+}
+
+let ticking = false;
+const onScroll = () => {
+  if (ticking) return;
+  ticking = true;
+  requestAnimationFrame(() => { ticking = false; frame(); });
+};
+window.addEventListener('scroll', onScroll, { passive: true });
+window.addEventListener('resize', () => { lastT = -1; onScroll(); });
+
+dots.forEach((b) => b.addEventListener('click', () => {
+  const span = track.offsetHeight - window.innerHeight;
+  const top = track.getBoundingClientRect().top + window.scrollY;
+  window.scrollTo({ top: top + (Number(b.dataset.i) / (SECTIONS.length - 1)) * span, behavior: reduced ? 'auto' : 'smooth' });
+}));
+
+frame();
+
+// ---------- Menu ----------
+const MENU = [
+  { name: 'גחלת', price: 58, tile: '#EDB79B', layers: ORDER, desc: 'הקלאסי שלנו: קציצה, צ\'דר, חסה, עגבנייה, בצל כבוש, חמוץ ורוטב הבית.' },
+  { name: 'גחלת כפולה', price: 76, tile: '#F0CC74', layers: ['bunBottom', 'patty', 'cheese', 'patty', 'cheese', 'onion', 'pickles', 'sauce', 'bunTop'], desc: 'שתי קציצות, שני צ\'דרים, בצל וחמוץ. בלי ירוקים שמסתירים.' },
+  { name: 'יער מעושן', price: 66, tile: '#D9C2DC', layers: ['bunBottom', 'patty', 'cheese', 'mushroom', 'onion', 'sauce', 'bunTop'], desc: 'פטריות פורטובלו צלויות על הגחלים, בצל ורוטב מעושן.' },
+  { name: 'גינה על האש', price: 62, tile: '#B9CDA2', layers: ['bunBottom', 'veg', 'lettuce', 'tomato', 'onion', 'pickles', 'sauce', 'bunTop'], desc: 'קציצת עדשים ופטריות, צלויה על אותה אש. טבעוני לגמרי.' },
+];
+document.getElementById('menuGrid').innerHTML = MENU.map((m, i) => {
+  const b = burgerMarkup(m.layers, `b${i}`);
+  return `<article class="item">
+    <div class="item-art" style="--tile:${m.tile}"><svg viewBox="${b.viewBox}" role="img" aria-label="${m.name}">${b.svg}</svg></div>
+    <div class="item-row"><h3>${m.name}</h3><span class="price">₪${m.price}</span></div>
+    <span class="layers-count">${m.layers.length} שכבות</span>
+    <p>${m.desc}</p>
+  </article>`;
+}).join('');
+</script>
+</body>
+</html>
